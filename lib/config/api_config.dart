@@ -7,7 +7,7 @@ class ApiConfig {
   ///   - Real phone (same wifi):  http://<YOUR-PC-IP>:8000/api
   ///
   /// Start the backend with:  php artisan serve
-  static const String baseUrl = 'http://10.0.2.2:8000/api';
+  static const String baseUrl = 'http://192.168.1.5:8000/api';
 
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 15);

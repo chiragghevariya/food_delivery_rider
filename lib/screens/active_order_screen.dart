@@ -61,12 +61,25 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
       if (!mounted) return;
       setState(() => _order = updated);
       if (updated.isDelivered) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Delivered! Great job 🎉')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Delivered! Great job 🎉'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: AppColors.success,
+          ),
+        );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(apiErrorMessage(e)),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: AppColors.danger,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -77,7 +90,7 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
     try {
       final loc = await LocationService.getCurrentLocation();
       await _mapController?.animateCamera(
-        CameraUpdate.newLatLng(LatLng(loc.lat, loc.lng)),
+        CameraUpdate.newLatLngZoom(LatLng(loc.lat, loc.lng), 15),
       );
     } catch (_) {
       // ignore — keep the default camera position
@@ -88,12 +101,58 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
   Widget build(BuildContext context) {
     final order = _order!;
     return Scaffold(
-      appBar: AppBar(title: Text('Delivery #${order.id}')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('Active Transit #${order.id}'),
+      ),
       bottomNavigationBar: _actionBar(order),
       body: Column(
         children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.4, child: _buildMap(order)),
-          Expanded(child: _buildDetails(order)),
+          // Map Section (40% Screen height)
+          Stack(
+            children: [
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.38,
+                child: _buildMap(order),
+              ),
+              // Floating Action Buttons on top of the Map
+              Positioned(
+                bottom: 16,
+                right: 16,
+                child: FloatingActionButton.small(
+                  onPressed: _centerOnRider,
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.my_location),
+                ),
+              ),
+            ],
+          ),
+          
+          // Details Card Section
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Status Header
+                  _buildHeaderCard(order),
+                  const SizedBox(height: 12),
+                  
+                  // Routing Details (Pickup / Drop-off)
+                  _buildRoutingCard(order),
+                  const SizedBox(height: 12),
+                  
+                  // Verification Checklist
+                  _buildChecklistCard(order),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -105,8 +164,8 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
 
     if (!hasRestaurant && !hasCustomer) {
       return Container(
-        color: const Color(0xFFE0E4E4),
-        child: const Center(child: Text('Map unavailable (no coordinates for this order).')),
+        color: const Color(0xFFE2E8F0),
+        child: const Center(child: Text('Map coordinates missing for this order.')),
       );
     }
 
@@ -119,7 +178,7 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
       markers.add(Marker(
         markerId: const MarkerId('restaurant'),
         position: p,
-        infoWindow: InfoWindow(title: 'Pickup', snippet: order.restaurantName),
+        infoWindow: InfoWindow(title: 'Restaurant Pickup', snippet: order.restaurantName),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
       ));
     }
@@ -129,13 +188,11 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
       markers.add(Marker(
         markerId: const MarkerId('customer'),
         position: p,
-        infoWindow: const InfoWindow(title: 'Drop-off'),
+        infoWindow: const InfoWindow(title: 'Customer Drop-off'),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
       ));
     }
 
-    // Straight line between the two pins. (A real road route would use the
-    // Google Directions API; a straight line keeps this simple.)
     final polylines = <Polyline>{};
     if (hasRestaurant && hasCustomer) {
       polylines.add(Polyline(
@@ -150,71 +207,225 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
       initialCameraPosition: CameraPosition(target: routePoints.first, zoom: 13),
       markers: markers,
       polylines: polylines,
-      myLocationEnabled: true, // shows the rider's blue dot (needs location permission)
+      myLocationEnabled: true,
       myLocationButtonEnabled: false,
       zoomControlsEnabled: false,
       onMapCreated: (controller) {
         _mapController = controller;
-        _centerOnRider(); // center the camera on the rider
+        _centerOnRider();
       },
     );
   }
 
-  Widget _buildDetails(Order order) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildHeaderCard(Order order) {
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: AppColors.border, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
           children: [
-            const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
-            StatusBadge(status: order.status),
-          ],
-        ),
-        const Divider(height: 24),
-        _infoRow(Icons.store, 'Pickup from', order.restaurantName ?? 'Restaurant', order.restaurantAddress),
-        const SizedBox(height: 10),
-        _infoRow(Icons.location_on, 'Deliver to', order.deliveryAddress ?? 'Customer', order.notes),
-        const Divider(height: 24),
-        const Text('Items', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        ...order.items.map((it) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                order.isPickedUp ? Icons.delivery_dining : Icons.store_rounded,
+                color: AppColors.primary,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${it.quantity}x', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(it.name ?? 'Item #${it.menuItemId ?? ''}')),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total Payout',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textLight,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      StatusBadge(status: order.status),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '\$${order.total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.success,
+                    ),
+                  ),
                 ],
               ),
-            )),
-        const Divider(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Order total', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('\$${order.total.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+            ),
           ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String value, String? sub) {
+  Widget _buildRoutingCard(Order order) {
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: AppColors.border, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'DELIVERY DIRECTIONS',
+              style: TextStyle(
+                fontSize: 11,
+                letterSpacing: 1.1,
+                color: AppColors.textLight,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Pickup details row
+            _routingRow(
+              icon: Icons.circle_outlined,
+              iconColor: AppColors.accent,
+              title: 'PICKUP FROM',
+              name: order.restaurantName ?? 'Restaurant',
+              address: order.restaurantAddress,
+              isActive: order.isReadyForPickup,
+            ),
+            
+            // Connecting line
+            Padding(
+              padding: const EdgeInsets.only(left: 8.5),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: 2,
+                  height: 24,
+                  color: AppColors.border,
+                ),
+              ),
+            ),
+            
+            // Dropoff details row
+            _routingRow(
+              icon: Icons.location_on_outlined,
+              iconColor: AppColors.primary,
+              title: 'DELIVER TO',
+              name: 'Customer Address',
+              address: order.deliveryAddress,
+              isActive: order.isPickedUp,
+            ),
+            
+            // Customer Notes alert card
+            if (order.notes != null && order.notes!.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.accent.withOpacity(0.2), width: 1),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline_rounded, color: AppColors.accent, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'COURIER INSTRUCTIONS',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            order.notes!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.text,
+                              fontStyle: FontStyle.italic,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _routingRow({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String name,
+    required String? address,
+    required bool isActive,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: AppColors.primary),
-        const SizedBox(width: 10),
+        Icon(icon, color: iconColor, size: 18),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textLight)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-              if (sub != null && sub.isNotEmpty)
-                Text(sub, style: const TextStyle(color: AppColors.textLight, fontSize: 12)),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 0.8,
+                  fontWeight: FontWeight.bold,
+                  color: isActive ? AppColors.primary : AppColors.textLight,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                name,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: isActive ? AppColors.text : AppColors.text.withOpacity(0.6),
+                ),
+              ),
+              if (address != null && address.isNotEmpty)
+                Text(
+                  address,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textLight,
+                  ),
+                ),
             ],
           ),
         ),
@@ -222,27 +433,105 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
     );
   }
 
+  Widget _buildChecklistCard(Order order) {
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: AppColors.border, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'ORDER INVOICE CHECKLIST',
+              style: TextStyle(
+                fontSize: 11,
+                letterSpacing: 1.1,
+                color: AppColors.textLight,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: order.items.length,
+              itemBuilder: (context, idx) {
+                final it = order.items[idx];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${it.quantity}x',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          it.name ?? 'Item #${it.menuItemId}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.check_box_outline_blank, color: AppColors.border, size: 20),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Bottom button changes with the order's status.
   Widget _actionBar(Order order) {
     String label;
+    IconData icon;
     VoidCallback? onTap;
 
     if (order.isReadyForPickup) {
-      label = 'Mark as Picked Up';
+      label = 'Confirm Pickup';
+      icon = Icons.shopping_bag_outlined;
       onTap = _advance;
     } else if (order.isPickedUp) {
-      label = 'Mark as Delivered';
+      label = 'Confirm Delivery';
+      icon = Icons.check_circle_outline;
       onTap = _advance;
     } else {
-      // delivered (or anything else) -> let the rider go back to the list
-      label = 'Done — back to orders';
+      label = 'Done — Back to Feed';
+      icon = Icons.arrow_back_rounded;
       onTap = () => Navigator.popUntil(context, ModalRoute.withName(Routes.available));
     }
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: PrimaryButton(label: label, loading: _busy, onPressed: onTap),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: PrimaryButton(
+          label: label,
+          icon: icon,
+          loading: _busy,
+          onPressed: onTap,
+        ),
       ),
     );
   }
