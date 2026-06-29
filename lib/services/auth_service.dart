@@ -25,10 +25,11 @@ class AuthService {
     ApiService.instance.setToken(token);
   }
 
-  Future<User> login({required String email, required String password}) async {
+  Future<User> login({required String email, required String password, String? fcmToken}) async {
     final res = await _dio.post('/auth/login', data: {
       'email': email,
       'password': password,
+      if (fcmToken != null) 'fcm_token': fcmToken,
     });
     await _saveToken(res.data['access_token'] as String);
     return User.fromJson(res.data['user'] as Map<String, dynamic>);

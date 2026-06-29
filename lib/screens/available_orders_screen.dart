@@ -6,6 +6,7 @@ import '../models/order.dart';
 import '../providers/auth_provider.dart';
 import '../providers/rider_order_provider.dart';
 import '../utils/error_utils.dart';
+import '../widgets/shimmer_loading.dart';
 
 /// Lists orders that are ready for a rider to pick up.
 class AvailableOrdersScreen extends StatefulWidget {
@@ -102,9 +103,7 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
             child: Consumer<RiderOrderProvider>(
               builder: (context, prov, _) {
                 if (prov.loading && prov.available.isEmpty) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
+                  return const ShimmerListPlaceholder(count: 3);
                 }
                 if (prov.error != null && prov.available.isEmpty) {
                   return _errorView(prov);

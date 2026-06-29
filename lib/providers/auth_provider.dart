@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 
 /// Holds the logged-in rider. Only users with the "rider" role may sign in here.
 class AuthProvider extends ChangeNotifier {
@@ -36,7 +37,12 @@ class AuthProvider extends ChangeNotifier {
   Future<void> login(String email, String password) async {
     _setBusy(true);
     try {
-      final user = await _authService.login(email: email, password: password);
+      final fcmToken = await NotificationService.getFCMToken();
+      final user = await _authService.login(
+        email: email,
+        password: password,
+        fcmToken: fcmToken,
+      );
       // This app is only for riders.
       if (!user.isRider) {
         await _authService.logout();

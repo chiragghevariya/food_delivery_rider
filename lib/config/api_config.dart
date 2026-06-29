@@ -8,6 +8,7 @@ class ApiConfig {
   ///
   /// Start the backend with:  php artisan serve
   static const String baseUrl = 'http://192.168.1.5:8000/api';
+  static const String googleMapsApiKey = 'AIzaSyBmIEJSOtppzhwY8ADACmFpj-VH8k9DOh8';
 
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 15);

@@ -10,8 +10,15 @@ import 'screens/available_orders_screen.dart';
 import 'screens/order_history_screen.dart';
 import 'screens/rider_login_screen.dart';
 import 'screens/splash_screen.dart';
+import 'services/notification_service.dart';
 
-void main() => runApp(const RiderApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await NotificationService.init();
+  } catch (_) {}
+  runApp(const RiderApp());
+}
 
 class RiderApp extends StatelessWidget {
   const RiderApp({super.key});

@@ -5,6 +5,7 @@ import '../models/order.dart';
 import '../services/rider_service.dart';
 import '../utils/error_utils.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/shimmer_loading.dart';
 
 /// Lists the rider's completed (delivered) orders.
 class OrderHistoryScreen extends StatefulWidget {
@@ -40,7 +41,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const ShimmerListPlaceholder(count: 3);
           }
           if (snapshot.hasError) {
             return Center(

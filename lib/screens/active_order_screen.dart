@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../config/app_theme.dart';
 import '../config/routes.dart';
 import '../models/order.dart';
+import '../services/directions_service.dart';
 import '../services/location_service.dart';
 import '../services/rider_service.dart';
 import '../utils/error_utils.dart';
@@ -21,11 +22,13 @@ class ActiveOrderScreen extends StatefulWidget {
 
 class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
   final RiderService _service = RiderService();
+  final DirectionsService _directionsService = DirectionsService();
   late final LocationService _location;
 
   Order? _order;
   GoogleMapController? _mapController;
   bool _busy = false;
+  List<LatLng> _routePoints = [];
 
   @override
   void didChangeDependencies() {
@@ -34,6 +37,24 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
       _order = ModalRoute.of(context)!.settings.arguments as Order;
       _location = LocationService(_service);
       _location.startSharing(); // POST /rider/location every 10 seconds
+      _fetchRoute();
+    }
+  }
+
+  Future<void> _fetchRoute() async {
+    final order = _order;
+    if (order == null) return;
+    final hasRestaurant = order.restaurantLat != null && order.restaurantLng != null;
+    final hasCustomer = order.deliveryLat != null && order.deliveryLng != null;
+    if (hasRestaurant && hasCustomer) {
+      final origin = LatLng(order.restaurantLat!, order.restaurantLng!);
+      final destination = LatLng(order.deliveryLat!, order.deliveryLng!);
+      final points = await _directionsService.getRoute(origin, destination);
+      if (mounted) {
+        setState(() {
+          _routePoints = points;
+        });
+      }
     }
   }
 
@@ -60,6 +81,7 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
       }
       if (!mounted) return;
       setState(() => _order = updated);
+      _fetchRoute();
       if (updated.isDelivered) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -194,11 +216,19 @@ class _ActiveOrderScreenState extends State<ActiveOrderScreen> {
     }
 
     final polylines = <Polyline>{};
-    if (hasRestaurant && hasCustomer) {
+    if (_routePoints.isNotEmpty) {
+      polylines.add(Polyline(
+        polylineId: const PolylineId('route'),
+        points: _routePoints,
+        color: AppColors.primary,
+        width: 4,
+      ));
+    } else if (hasRestaurant && hasCustomer) {
+      // Fallback to straight line if Directions API fails or is loading
       polylines.add(Polyline(
         polylineId: const PolylineId('route'),
         points: routePoints,
-        color: AppColors.primary,
+        color: AppColors.primary.withOpacity(0.5),
         width: 4,
       ));
     }

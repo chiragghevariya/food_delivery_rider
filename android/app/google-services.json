@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "348920982971",
+    "project_id": "food-delivery-rider-21753",
+    "storage_bucket": "food-delivery-rider-21753.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:348920982971:android:d80c6deec27fa49193a89e",
+        "android_client_info": {
+          "package_name": "com.example.food_delivery_rider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKoczmNNXgrepENNuo4gyPDMRd22JZY6E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
